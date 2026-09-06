@@ -7,6 +7,10 @@ import type {
   RuntimeMobileSessionTerminalTab
 } from '../../shared/runtime-types'
 import { parseAppSshPtyId } from '../../shared/ssh-pty-id'
+import {
+  collectRecentTabIdsFromGroups,
+  pickNextTabAfterClose
+} from '../../shared/session-tab-close-successor'
 import { buildHeadlessMobileSessionTabGroups } from './mobile-session-layout-projection'
 import { appendRetiredTerminalSurfaceProofs } from './mobile-session-terminal-retirement-proof'
 import type { RuntimePtyWorktreeRecord } from './runtime-terminal-state-records'
@@ -97,7 +101,14 @@ export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWi
       }
       return false
     })
-    const active = nextTabs.find((candidate) => candidate.isActive) ?? nextTabs[0] ?? null
+    const active =
+      nextTabs.find((candidate) => candidate.isActive) ??
+      pickNextTabAfterClose(
+        nextTabs,
+        closedParentTabId,
+        collectRecentTabIdsFromGroups(snapshot.tabGroups),
+        (candidate) => (candidate.type === 'terminal' ? candidate.parentTabId : candidate.id)
+      )
     // A close is not a handover: the generation publishing this worktree still is. Minting an epoch
     // here published a stranger for a worktree the renderer owns, and a client that retires what it
     // displaces then rejected that renderer's own next frame. The sibling headless writers carry the

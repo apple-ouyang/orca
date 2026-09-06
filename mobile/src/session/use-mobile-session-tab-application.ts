@@ -20,8 +20,12 @@ import {
 import type { SessionTabsApplyOutcome } from './mobile-session-tabs-stream-health'
 import { getActiveTabIdForHandle } from './mobile-session-route-helpers'
 import { resolveActiveSessionTab } from './active-session-tab'
+<<<<<<< HEAD
 import { activateMobileSessionTab } from './mobile-session-tab-activation'
 import { releaseTerminalCreateLock } from './terminal-create-lock'
+=======
+import { rememberRecentTabId } from '../../../src/shared/session-tab-close-successor'
+>>>>>>> 5052aee50 (fix(mobile): preserve recent tab successor across split surfaces)
 import type { MobileSessionTab, SessionTabsResult } from './mobile-session-route-types'
 import type { MobileSessionTerminalListModel } from './use-mobile-session-terminal-list'
 
@@ -40,6 +44,7 @@ export function useMobileSessionTabApplication(scope: MobileSessionTerminalListM
     setActiveHandle,
     setActiveSessionTabId,
     activeSessionTabIdRef,
+    recentSessionTabIdsRef,
     selectedSessionTabIdRef,
     markdownDocsRef,
     initializedHandlesRef,
@@ -70,6 +75,9 @@ export function useMobileSessionTabApplication(scope: MobileSessionTerminalListM
         Date.now()
       )
       const presentTabIds = new Set(nextTabs.map((tab) => tab.id))
+      recentSessionTabIdsRef.current = recentSessionTabIdsRef.current.filter((id) =>
+        presentTabIds.has(id)
+      )
       const orphanedDraftTabs: MobileSessionTab[] = []
       const currentMarkdownDocs = markdownDocsRef.current
       const currentSessionTabs = sessionTabsRef.current
@@ -147,6 +155,8 @@ export function useMobileSessionTabApplication(scope: MobileSessionTerminalListM
       const pendingActiveTerminalHandle = pendingSelectionHandle(pendingSelectionRef.current)
       const resolved = resolveActiveSessionTab(nextTabs, {
         pendingActiveSessionTabId,
+        previousActiveTabId: activeSessionTabIdRef.current,
+        recentTabIds: recentSessionTabIdsRef.current,
         selectedSessionTabId: selectedSessionTabIdRef.current,
         navigationIntent: result.navigationIntent
       })
@@ -189,6 +199,12 @@ export function useMobileSessionTabApplication(scope: MobileSessionTerminalListM
           const nextActiveTabId = getActiveTabIdForHandle(nextTabs, pendingActiveTerminalHandle)
           activeSessionTabIdRef.current = nextActiveTabId
           setActiveSessionTabId(nextActiveTabId)
+          if (nextActiveTabId) {
+            recentSessionTabIdsRef.current = rememberRecentTabId(
+              recentSessionTabIdsRef.current,
+              nextActiveTabId
+            )
+          }
           activeSessionTabTypeRef.current = 'terminal'
           // Why: every other active-handle branch assigns the ref alongside the
           // state. Leaving it stale here makes `covered` resolve against the wrong
@@ -208,6 +224,12 @@ export function useMobileSessionTabApplication(scope: MobileSessionTerminalListM
       activeSessionTabTypeRef.current = active?.type ?? null
       activeSessionTabIdRef.current = active?.id ?? null
       setActiveSessionTabId(active?.id ?? null)
+      if (active?.id) {
+        recentSessionTabIdsRef.current = rememberRecentTabId(
+          recentSessionTabIdsRef.current,
+          active.id
+        )
+      }
       if (active?.type === 'terminal') {
         if (typeof active.terminal !== 'string') {
           const previous = activeHandleRef.current

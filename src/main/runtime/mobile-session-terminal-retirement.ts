@@ -192,7 +192,8 @@ function chooseActiveSurface(
     pickNextTabAfterClose(
       tabs,
       previousActiveId ?? '',
-      collectRecentTabIdsFromGroups(groups)
+      collectRecentTabIdsFromGroups(groups),
+      topLevelTabId
     )
   )
 }
