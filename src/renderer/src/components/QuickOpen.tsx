@@ -233,7 +233,7 @@ function QuickOpenContent({ visible }: { visible: boolean }): React.JSX.Element 
           <div className="py-6 px-4 text-center text-sm text-muted-foreground whitespace-pre-wrap">
             {absolutePathError}
           </div>
-        ) : isTabEntryAbsolutePathLike(query.trim()) && !absolutePathAllowed ? (
+        ) : absolutePath && !absolutePathAllowed ? (
           <div className="py-6 px-4 text-center text-sm text-muted-foreground whitespace-pre-wrap">
             {TAB_ENTRY_ABSOLUTE_PATH_REMOTE_BLOCKED_MESSAGE}
           </div>
