@@ -67,7 +67,7 @@ function TabBarInner(props: TabBarProps): React.JSX.Element {
   const tabStripNavigation = useTabStripOverflowNavigation({
     activeVisibleTabId: itemProjection.activeVisibleTabId,
     layoutKey: itemProjection.tabStripLayoutKey,
-    tabCount: itemProjection.orderedItems.length,
+    tabCount: itemProjection.stripEntries.length,
     worktreeId
   })
   const tabStripDragScroll = useTabStripDragScrollHandlers(tabStripNavigation.scrollTabStrip, {
