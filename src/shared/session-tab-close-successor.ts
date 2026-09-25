@@ -60,3 +60,14 @@ export function collectRecentTabIdsFromGroups(
   }
   return merged
 }
+
+export function pruneRecentTabIds(
+  recentTabIds: readonly string[] | undefined,
+  validTabIds: ReadonlySet<string>
+): string[] | undefined {
+  if (!recentTabIds) {
+    return undefined
+  }
+  const retained = recentTabIds.filter((tabId) => validTabIds.has(tabId))
+  return retained.length > 0 ? retained : undefined
+}

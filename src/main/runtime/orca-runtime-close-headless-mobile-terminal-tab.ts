@@ -89,12 +89,18 @@ export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWi
       }
       return false
     })
+    const remainingTopLevelIds = new Set(
+      nextTabs.map((candidate) =>
+        candidate.type === 'terminal' ? candidate.parentTabId : candidate.id
+      )
+    )
+    const recentTabIds = snapshot.recentTabIds?.filter((tabId) => remainingTopLevelIds.has(tabId))
     const active =
       nextTabs.find((candidate) => candidate.isActive) ??
       pickNextTabAfterClose(
         nextTabs,
         closedParentTabId,
-        collectRecentTabIdsFromGroups(snapshot.tabGroups),
+        recentTabIds ?? collectRecentTabIdsFromGroups(snapshot.tabGroups),
         (candidate) => (candidate.type === 'terminal' ? candidate.parentTabId : candidate.id)
       )
     const nextSnapshot: RuntimeMobileSessionTabsSnapshot = {
@@ -103,6 +109,7 @@ export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWi
       snapshotVersion: snapshot.snapshotVersion + 1,
       activeTabId: active?.id ?? null,
       activeTabType: active?.type ?? null,
+      ...(recentTabIds && recentTabIds.length > 0 ? { recentTabIds } : {}),
       tabGroups: buildHeadlessMobileSessionTabGroups(
         worktreeId,
         nextTabs,

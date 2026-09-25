@@ -1,4 +1,5 @@
 import type { RuntimeMobileSessionTabsResult } from '../../shared/runtime-types'
+import { pruneRecentTabIds } from '../../shared/session-tab-close-successor'
 import type {
   RuntimeMobileSessionProjectionHost,
   RuntimeMobileSessionProjectionInput
@@ -30,6 +31,7 @@ export function finalizeRuntimeMobileSessionTabsResult(
         )?.id ??
         tabGroups?.[0]?.id ??
         null)
+  const recentTabIds = pruneRecentTabIds(snapshot.recentTabIds, host.collectTabIds(normalizedTabs))
   return {
     worktree: snapshot.worktree,
     publicationEpoch: snapshot.publicationEpoch,
@@ -37,6 +39,7 @@ export function finalizeRuntimeMobileSessionTabsResult(
     activeGroupId,
     activeTabId: active?.id ?? null,
     activeTabType: active?.type ?? null,
+    ...(recentTabIds ? { recentTabIds } : {}),
     ...(tabGroups ? { tabGroups } : {}),
     ...(snapshot.tabGroupLayout !== undefined ? { tabGroupLayout } : {}),
     ...(snapshot.retiredTerminalSurfaces

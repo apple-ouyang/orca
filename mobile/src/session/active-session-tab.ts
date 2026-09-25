@@ -34,10 +34,7 @@ export function resolveActiveSessionTab<T extends SessionTabLike>(
   const snapshotActive =
     tabs.find((tab) => tab.isActive) ??
     previousActive ??
-    (opts.previousActiveTabId
-      ? pickNextTabAfterClose(tabs, opts.previousActiveTabId, opts.recentTabIds)
-      : null) ??
-    tabs[0] ??
+    pickNextTabAfterClose(tabs, opts.previousActiveTabId ?? '', opts.recentTabIds) ??
     null
   const pendingActiveSessionTabId = opts.pendingActiveSessionTabId
   // Why: targeted follow is the only host action allowed to supersede phone-local intent.

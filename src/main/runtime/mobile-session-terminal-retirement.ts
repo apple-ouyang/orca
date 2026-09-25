@@ -160,14 +160,17 @@ function chooseActiveSurface(
   tabs: readonly RuntimeMobileSessionSnapshotTab[],
   previousActiveId: string | null,
   groups: readonly RuntimeMobileSessionTabGroup[] | undefined,
-  previousActiveGroupId: string | null
+  previousActiveGroupId: string | null,
+  recentTabIds?: readonly string[]
 ): RuntimeMobileSessionSnapshotTab | null {
   const previous = previousActiveId ? tabs.find((tab) => tab.id === previousActiveId) : undefined
   if (previous) {
     return previous
   }
   const activeGroup =
-    groups?.find((group) => group.id === previousActiveGroupId) ?? groups?.[0] ?? null
+    (previousActiveGroupId
+      ? groups?.find((group) => group.id === previousActiveGroupId)
+      : groups?.[0]) ?? null
   const activeTopLevelId = activeGroup?.activeTabId
   return (
     (activeTopLevelId
@@ -178,7 +181,7 @@ function chooseActiveSurface(
     pickNextTabAfterClose(
       tabs,
       previousActiveId ?? '',
-      collectRecentTabIdsFromGroups(groups),
+      recentTabIds ?? collectRecentTabIdsFromGroups(groups),
       topLevelTabId
     )
   )
@@ -256,11 +259,13 @@ export function retireTerminalSurfacesFromSnapshot(args: {
     args.snapshot.tabGroups,
     validTopLevelIds
   )
+  const recentTabIds = args.snapshot.recentTabIds?.filter((tabId) => validTopLevelIds.has(tabId))
   const active = chooseActiveSurface(
     tabs,
     args.snapshot.activeTabId,
     tabGroups,
-    args.snapshot.activeGroupId
+    args.snapshot.activeGroupId,
+    recentTabIds
   )
   tabs = tabs.map((tab) => ({ ...tab, isActive: tab.id === active?.id }))
   const activeTopLevelId = active ? topLevelTabId(active) : null
@@ -285,6 +290,7 @@ export function retireTerminalSurfacesFromSnapshot(args: {
       activeGroupId,
       activeTabId: active?.id ?? null,
       activeTabType: active?.type ?? null,
+      ...(recentTabIds && recentTabIds.length > 0 ? { recentTabIds } : {}),
       ...(tabGroups ? { tabGroups } : { tabGroups: undefined }),
       ...(args.snapshot.tabGroupLayout
         ? {
