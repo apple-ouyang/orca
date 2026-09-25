@@ -3,6 +3,7 @@ import {
   collectRecentTabIdsFromGroups,
   pickNextTabAfterClose,
   pickNextTabIdAfterClose,
+  pruneRecentTabIds,
   rememberRecentTabId
 } from './session-tab-close-successor'
 
@@ -80,5 +81,16 @@ describe('collectRecentTabIdsFromGroups', () => {
     expect(
       collectRecentTabIdsFromGroups([{ recentTabIds: ['a', 'b'] }, { recentTabIds: ['c', 'a'] }])
     ).toEqual(['b', 'c', 'a'])
+  })
+})
+
+describe('pruneRecentTabIds', () => {
+  it('keeps only visits whose tabs are still present', () => {
+    expect(pruneRecentTabIds(['a', 'gone', 'b'], new Set(['a', 'b']))).toEqual(['a', 'b'])
+  })
+
+  it('drops the history entirely when no visit survives', () => {
+    expect(pruneRecentTabIds(['gone'], new Set(['a']))).toBeUndefined()
+    expect(pruneRecentTabIds(undefined, new Set(['a']))).toBeUndefined()
   })
 })
