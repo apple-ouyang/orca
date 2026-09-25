@@ -1,3 +1,4 @@
+import { normalizeRuntimePathForComparison } from '../cross-platform-path'
 import { WORKTREE_ID_SEPARATOR } from '../pty-session-id-format'
 
 export { WORKTREE_ID_SEPARATOR } from '../pty-session-id-format'
@@ -15,6 +16,35 @@ const FOLDER_WORKSPACE_INSTANCE_SUFFIX = new RegExp(
 export function getRepoIdFromWorktreeId(worktreeId: string): string {
   const separatorIdx = worktreeId.indexOf(WORKTREE_ID_SEPARATOR)
   return separatorIdx === -1 ? worktreeId : worktreeId.slice(0, separatorIdx)
+}
+
+/**
+ * Canonical comparison form of a worktree id: the repoId is compared EXACT and only the path folds,
+ * through the same `normalizeRuntimePathForComparison` a `path:` selector applies. Null for a
+ * malformed id so callers keep exact matching for it. Comparison only — never persist this key.
+ */
+export function worktreeIdComparisonKey(worktreeId: string): string | null {
+  const parsed = splitWorktreeId(worktreeId)
+  if (!parsed || !parsed.repoId || !parsed.worktreePath) {
+    return null
+  }
+  return `${parsed.repoId}${WORKTREE_ID_SEPARATOR}${normalizeRuntimePathForComparison(
+    parsed.worktreePath
+  )}`
+}
+
+/**
+ * Why: workspace identity is per *workspace*, not per checkout-dir spelling. Path spellings
+ * (trailing slash, duplicate separators, WSL UNC aliases) must match themselves across writers,
+ * while folder-workspace `::workspace:<uuid>` suffixes stay distinct — stripping them here would
+ * let one session steal a sibling's PTYs. Falls back to exact equality for malformed ids.
+ */
+export function worktreeIdsEqual(left: string, right: string): boolean {
+  if (left === right) {
+    return true
+  }
+  const leftKey = worktreeIdComparisonKey(left)
+  return leftKey === null ? false : leftKey === worktreeIdComparisonKey(right)
 }
 
 export function splitWorktreeId(worktreeId: string): ParsedWorktreeId | null {
