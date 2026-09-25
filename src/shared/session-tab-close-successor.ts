@@ -16,7 +16,12 @@ export function rememberRecentTabId(
  * If there is no previous visit, use the most recently added remaining tab
  * (last in strip order), never the leftmost by default.
  */
-export function pickNextTabIdAfterClose(args: {
+/**
+ * Pick the most recently visited surviving tab id, ignoring `closingTabId`.
+ * Returns null when the history has no surviving entry so callers can layer
+ * their own fallbacks ahead of the last-added default.
+ */
+export function pickMostRecentSurvivingTabId(args: {
   remainingTabIds: readonly string[]
   closingTabId: string
   recentTabIds?: readonly string[]
@@ -29,7 +34,15 @@ export function pickNextTabIdAfterClose(args: {
       return id
     }
   }
-  return args.remainingTabIds.at(-1) ?? null
+  return null
+}
+
+export function pickNextTabIdAfterClose(args: {
+  remainingTabIds: readonly string[]
+  closingTabId: string
+  recentTabIds?: readonly string[]
+}): string | null {
+  return pickMostRecentSurvivingTabId(args) ?? args.remainingTabIds.at(-1) ?? null
 }
 
 export function pickNextTabAfterClose<T>(

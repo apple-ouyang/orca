@@ -7,7 +7,9 @@ import type {
 } from '../../shared/runtime-types'
 import {
   collectRecentTabIdsFromGroups,
-  pickNextTabAfterClose
+  pickMostRecentSurvivingTabId,
+  pickNextTabAfterClose,
+  pruneRecentTabIds
 } from '../../shared/session-tab-close-successor'
 import type { TabGroupLayoutNode } from '../../shared/tab-types'
 import type {
@@ -139,13 +141,13 @@ export function repairMobileSessionTabGroupsAfterRetirement(
       return []
     }
     const retained = new Set(tabOrder)
-    const recentTabIds = group.recentTabIds?.filter((tabId) => retained.has(tabId))
     return [
       {
         ...group,
         tabOrder,
         activeTabId: chooseGroupActiveTab(group, retained),
-        ...(recentTabIds && recentTabIds.length > 0 ? { recentTabIds } : {})
+        // Why: assigned explicitly so an emptied history drops its stale ids.
+        recentTabIds: pruneRecentTabIds(group.recentTabIds, retained)
       }
     ]
   })
@@ -163,27 +165,31 @@ function chooseActiveSurface(
   previousActiveGroupId: string | null,
   recentTabIds?: readonly string[]
 ): RuntimeMobileSessionSnapshotTab | null {
-  const previous = previousActiveId ? tabs.find((tab) => tab.id === previousActiveId) : undefined
-  if (previous) {
-    return previous
+  // Why: keep a surviving active surface first — the previous tab when it lives,
+  // otherwise a surviving pane of the retired active terminal (split terminal).
+  const preserved =
+    (previousActiveId ? tabs.find((tab) => tab.id === previousActiveId) : undefined) ??
+    tabs.find((tab) => tab.isActive)
+  if (preserved) {
+    return preserved
   }
-  const activeGroup =
-    (previousActiveGroupId
-      ? groups?.find((group) => group.id === previousActiveGroupId)
-      : groups?.[0]) ?? null
+  // Why: the visit history (global first, per-group merge for older snapshots)
+  // outranks the repaired group selection, so retiring the active tab cannot
+  // resurrect an older group sibling over a newer cross-group visit.
+  const history = recentTabIds ?? collectRecentTabIdsFromGroups(groups)
+  const recentId = pickMostRecentSurvivingTabId({
+    remainingTabIds: tabs.map(topLevelTabId),
+    closingTabId: previousActiveId ?? '',
+    recentTabIds: history
+  })
+  const activeGroup = previousActiveGroupId
+    ? groups?.find((group) => group.id === previousActiveGroupId)
+    : groups?.[0]
   const activeTopLevelId = activeGroup?.activeTabId
   return (
-    (activeTopLevelId
-      ? (tabs.find((tab) => topLevelTabId(tab) === activeTopLevelId && tab.isActive) ??
-        tabs.find((tab) => topLevelTabId(tab) === activeTopLevelId))
-      : undefined) ??
-    tabs.find((tab) => tab.isActive) ??
-    pickNextTabAfterClose(
-      tabs,
-      previousActiveId ?? '',
-      recentTabIds ?? collectRecentTabIdsFromGroups(groups),
-      topLevelTabId
-    )
+    (recentId ? tabs.find((tab) => topLevelTabId(tab) === recentId) : undefined) ??
+    (activeTopLevelId ? tabs.find((tab) => topLevelTabId(tab) === activeTopLevelId) : undefined) ??
+    pickNextTabAfterClose(tabs, previousActiveId ?? '', history, topLevelTabId)
   )
 }
 
@@ -259,7 +265,7 @@ export function retireTerminalSurfacesFromSnapshot(args: {
     args.snapshot.tabGroups,
     validTopLevelIds
   )
-  const recentTabIds = args.snapshot.recentTabIds?.filter((tabId) => validTopLevelIds.has(tabId))
+  const recentTabIds = pruneRecentTabIds(args.snapshot.recentTabIds, validTopLevelIds)
   const active = chooseActiveSurface(
     tabs,
     args.snapshot.activeTabId,
@@ -290,7 +296,8 @@ export function retireTerminalSurfacesFromSnapshot(args: {
       activeGroupId,
       activeTabId: active?.id ?? null,
       activeTabType: active?.type ?? null,
-      ...(recentTabIds && recentTabIds.length > 0 ? { recentTabIds } : {}),
+      // Why: assigned explicitly so an emptied history drops its stale ids.
+      recentTabIds,
       ...(tabGroups ? { tabGroups } : { tabGroups: undefined }),
       ...(args.snapshot.tabGroupLayout
         ? {

@@ -9,7 +9,8 @@ import type {
 import { parseAppSshPtyId } from '../../shared/ssh-pty-id'
 import {
   collectRecentTabIdsFromGroups,
-  pickNextTabAfterClose
+  pickNextTabAfterClose,
+  pruneRecentTabIds
 } from '../../shared/session-tab-close-successor'
 import { buildHeadlessMobileSessionTabGroups } from './mobile-session-layout-projection'
 import { appendRetiredTerminalSurfaceProofs } from './mobile-session-terminal-retirement-proof'
@@ -94,7 +95,7 @@ export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWi
         candidate.type === 'terminal' ? candidate.parentTabId : candidate.id
       )
     )
-    const recentTabIds = snapshot.recentTabIds?.filter((tabId) => remainingTopLevelIds.has(tabId))
+    const recentTabIds = pruneRecentTabIds(snapshot.recentTabIds, remainingTopLevelIds)
     const active =
       nextTabs.find((candidate) => candidate.isActive) ??
       pickNextTabAfterClose(
@@ -109,7 +110,9 @@ export class OrcaRuntimeWithCloseHeadlessMobileTerminalTab extends OrcaRuntimeWi
       snapshotVersion: snapshot.snapshotVersion + 1,
       activeTabId: active?.id ?? null,
       activeTabType: active?.type ?? null,
-      ...(recentTabIds && recentTabIds.length > 0 ? { recentTabIds } : {}),
+      // Why: assign explicitly so an emptied history drops its stale ids
+      // instead of surviving through the spread.
+      recentTabIds,
       tabGroups: buildHeadlessMobileSessionTabGroups(
         worktreeId,
         nextTabs,
