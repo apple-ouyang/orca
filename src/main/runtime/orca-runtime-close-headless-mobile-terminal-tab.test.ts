@@ -94,7 +94,9 @@ function createRuntimeHarness() {
   const stored: RuntimeMobileSessionTabsSnapshot[] = []
   Object.assign(runtime, {
     getMobileSessionTerminalRetirementProof: vi.fn(() => null),
-    commitHeadlessTerminalTabRetirement: vi.fn(() => [] as string[]),
+    captureTerminalTabRetirement: vi.fn(() => () => ({ matches: true })),
+    closeTerminalSurface: vi.fn(async () => [] as string[]),
+    mobileSessionTabsByWorktree: new Map(),
     clearRuntimeSessionOwnershipForMobileTab: vi.fn(),
     getMobileTerminalLeafPtyIds: vi.fn(() => [] as string[]),
     findPtyForMobileTerminalTab: vi.fn(() => undefined),
@@ -113,26 +115,66 @@ function createRuntimeHarness() {
 // remaining tab. The per-group MRU merge below would surface b-old (its group's
 // stack is merged last), even though a-new was visited after it.
 describe('closeHeadlessMobileTerminalTab successor selection', () => {
-  it('follows the global visit history across groups, not the group-merged order', () => {
+  it('follows the global visit history across groups, not the group-merged order', async () => {
     const { runtime, stored } = createRuntimeHarness()
     const snapshot = crossGroupSnapshot()
     const closedTab = snapshot.tabs.find(
       (tab): tab is RuntimeMobileSessionTerminalTab => tab.id === 'b-closing::left'
     )!
 
-    ;(
+    await (
       runtime as unknown as {
         closeHeadlessMobileTerminalTab: (
           worktreeId: string,
           snapshot: RuntimeMobileSessionTabsSnapshot,
           tab: RuntimeMobileSessionTerminalTab,
           options?: { killPtys?: boolean }
-        ) => void
+        ) => Promise<void>
       }
     ).closeHeadlessMobileTerminalTab(WORKTREE_ID, snapshot, closedTab, { killPtys: false })
 
     expect(stored).toHaveLength(1)
     expect(stored[0]).toMatchObject({ activeTabId: 'a-new', activeTabType: 'markdown' })
     expect(stored[0].recentTabIds).toEqual(['b-old', 'a-new'])
+  })
+
+  it('falls back to the group history when every global history id is gone', async () => {
+    const { runtime, stored } = createRuntimeHarness()
+    const snapshot = crossGroupSnapshot()
+    // Every global history entry is either stale or the closing tab, so the
+    // filtered history is empty and the group history must supply the successor.
+    snapshot.recentTabIds = ['gone-stale', 'b-closing']
+    // x-last is the last-added remaining tab; only the group history can prefer b-old.
+    snapshot.tabs.push({
+      type: 'file',
+      id: 'x-last',
+      title: 'X Last',
+      filePath: '/worktree/x.ts',
+      relativePath: 'x.ts',
+      language: 'typescript',
+      isDirty: false,
+      isActive: false
+    })
+    const closedTab = snapshot.tabs.find(
+      (tab): tab is RuntimeMobileSessionTerminalTab => tab.id === 'b-closing::left'
+    )!
+
+    await (
+      runtime as unknown as {
+        closeHeadlessMobileTerminalTab: (
+          worktreeId: string,
+          snapshot: RuntimeMobileSessionTabsSnapshot,
+          tab: RuntimeMobileSessionTerminalTab,
+          options?: { killPtys?: boolean }
+        ) => Promise<void>
+      }
+    ).closeHeadlessMobileTerminalTab(WORKTREE_ID, snapshot, closedTab, { killPtys: false })
+
+    expect(stored).toHaveLength(1)
+    // b-old is the most recent surviving group-history tab; the last-added tab
+    // x-last must not win just because the global history filtered to empty.
+    expect(stored[0]).toMatchObject({ activeTabId: 'b-old' })
+    // Stale history must be cleared instead of carried over into the snapshot.
+    expect(stored[0].recentTabIds).toBeUndefined()
   })
 })
