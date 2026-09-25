@@ -50,7 +50,8 @@ export function ptyBindingIsRefused(
   }
   if (args.expectedBinding) {
     const tab = session.tabsByWorktree?.[bindingWorktreeId]?.find(
-      (candidate) => candidate.id === args.tabId && candidate.worktreeId === bindingWorktreeId
+      (candidate) =>
+        candidate.id === args.tabId && worktreeIdsEqual(candidate.worktreeId, bindingWorktreeId)
     )
     const boundPtyId = session.terminalLayoutsByTabId?.[args.tabId]?.ptyIdsByLeafId?.[args.leafId]
     if (
