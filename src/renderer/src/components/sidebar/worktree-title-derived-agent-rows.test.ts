@@ -190,6 +190,23 @@ describe('buildTitleDerivedAgentRows', () => {
     expect(rows[0].state).toBe('working')
   })
 
+  // Why: a hookless remote tab keeps its launchAgent after the agent exits (no
+  // completion hook, no shell-foreground signal to clearTabLaunchAgent). The
+  // launchAgent fallback must stay scoped to tabs with no mounted PTY, or that
+  // stale identity pins an idle row to a plain shell forever.
+  it('does not keep an idle launch-agent row for a mounted tab with no pane titles', () => {
+    const rows = buildWorktreeAgentRows({
+      tabs: [makeTab('tab-1', { launchAgent: 'codex', title: 'bash' })],
+      entries: [],
+      retained: [],
+      ptyIdsByTabId: { 'tab-1': ['pty-remote'] },
+      terminalLayoutsByTabId: { 'tab-1': makeSingleLayout(LEAF_ID_1) },
+      now: 2000
+    })
+
+    expect(rows).toHaveLength(0)
+  })
+
   it('uses runtime orchestration metadata for title-derived worker rows', () => {
     const parentPaneKey = makePaneKey('tab-parent', LEAF_ID_1)
     const childPaneKey = makePaneKey('tab-child', LEAF_ID_2)

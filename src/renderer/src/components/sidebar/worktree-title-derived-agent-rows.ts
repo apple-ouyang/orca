@@ -122,6 +122,15 @@ export function buildTitleDerivedAgentRows(args: {
       }
     }
 
+    // Why: the launchAgent fallback only exists for phone-launched tabs the
+    // desktop has not mounted a PTY for yet. A mounted tab is represented by its
+    // pane titles above; falling through here would let a stale launch identity
+    // (a hookless remote agent has no completion hook and no shell-foreground
+    // signal to clearTabLaunchAgent) pin an idle row to a plain shell forever.
+    if (hasLivePty) {
+      continue
+    }
+
     const launchAgentRow = buildLaunchAgentFallbackRow({
       tab,
       layout,
