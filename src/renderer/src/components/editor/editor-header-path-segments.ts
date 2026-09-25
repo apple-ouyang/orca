@@ -1,3 +1,4 @@
+import { translate } from '@/i18n/i18n'
 import { joinPath } from '@/lib/path'
 import {
   isRuntimePathAbsolute,
@@ -13,8 +14,6 @@ export type EditorHeaderPathSegment = {
   isFile: boolean
 }
 
-const PREVIEW_SUFFIX = ' (preview)'
-
 export function canNavigateEditorHeaderPath(
   file: Pick<OpenFile, 'mode' | 'relativePath'>
 ): boolean {
@@ -25,7 +24,9 @@ export function canNavigateEditorHeaderPath(
 }
 
 export function getEditorHeaderPathPreviewSuffix(file: Pick<OpenFile, 'mode'>): string | null {
-  return file.mode === 'markdown-preview' ? PREVIEW_SUFFIX : null
+  return file.mode === 'markdown-preview'
+    ? translate('auto.components.editor.EditorPanelHeaderPath.previewSuffix', ' (preview)')
+    : null
 }
 
 export function getEditorHeaderPathSegments(
