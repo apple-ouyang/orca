@@ -2,7 +2,7 @@ import type { IPtyProvider } from '../providers/types'
 import type { OrcaRuntimeService } from './orca-runtime'
 import { listRegisteredPtys } from '../memory/pty-registry'
 import { isPathInsideOrEqual } from '../../shared/cross-platform-path'
-import { splitWorktreeId, splitWorktreeIdForFilesystem } from '../../shared/worktree/id'
+import { splitWorktreeId, splitWorktreeIdForFilesystem, worktreeIdsEqual } from '../../shared/worktree/id'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 import {
   isUnstoppedPtyRemovalError,
@@ -286,15 +286,21 @@ async function sweepProviderByPrefix(
     ? await provider.listProcesses({ deadlineMs: rpcDeadline })
     : await provider.listProcesses({ deadlineMs: rpcDeadline }).catch(() => [])
   const ownedSessions = sessions.filter((session) => {
+    // Why: a moved terminal keeps its spawn-time `${worktreeId}@@` session id while
+    // its authoritative ownership points at the destination worktree. The declared
+    // worktree outranks the stale prefix (and the cwd fallback), so deleting the
+    // spawn worktree never sweeps a PTY that now lives elsewhere.
+    if (session.worktreeId !== undefined) {
+      return worktreeIdsEqual(session.worktreeId, worktreeId)
+    }
     // Why: older daemon/relay process rows may omit cwd; their established ID
     // and authoritative worktree ownership must remain usable during teardown.
     const cwdOwned =
       cwdFallbackPath !== undefined &&
-      session.worktreeId === undefined &&
       typeof session.cwd === 'string' &&
       session.cwd.length > 0 &&
       isPathInsideOrEqual(cwdFallbackPath, session.cwd)
-    return session.id.startsWith(prefix) || session.worktreeId === worktreeId || cwdOwned
+    return session.id.startsWith(prefix) || cwdOwned
   })
   // Why: agent shutdown snapshots coalesce only when requests begin together;
   // bounded concurrency avoids serial process scans without unbounded fanout.
@@ -337,7 +343,7 @@ async function sweepRegistryForWorktree(
   onPtyStopped?: (ptyId: string) => void
 ): Promise<number> {
   const rpcDeadline = teardownRpcDeadline(deadline)
-  const entries = listRegisteredPtys().filter((r) => r.worktreeId === worktreeId)
+  const entries = listRegisteredPtys().filter((r) => worktreeIdsEqual(r.worktreeId ?? '', worktreeId))
   const stopped = await mapWithConcurrency(
     entries,
     WORKTREE_TEARDOWN_CONCURRENCY,

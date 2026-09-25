@@ -718,6 +718,7 @@ import {
 } from '../../shared/claude-agent-teams-tmux-compat'
 import { joinWorktreeRelativePath } from './runtime-relative-paths'
 import { collectMemorySnapshot } from '../memory/collector'
+import { updateRegisteredPtyWorktree } from '../memory/pty-registry'
 import { app, BrowserWindow, ipcMain, Notification } from 'electron'
 import { RendererPublicationThrottle } from '../window/renderer-publication-throttle'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
@@ -31960,6 +31961,7 @@ export class OrcaRuntimeService {
       // Why: restored/controller-discovered PTYs learn their worktree here without registerPty(), so URL enrichment must bind at this source.
       advertisedUrlWatcher.bindPty(ptyId, worktreeId)
       this.ptyController?.setWorktreeId?.(ptyId, worktreeId)
+      updateRegisteredPtyWorktree(ptyId, worktreeId)
       return pty
     }
 
@@ -32016,6 +32018,7 @@ export class OrcaRuntimeService {
     // Why: recordPtyWorktree is the common lifecycle point for every path that resolves a PTY's worktree (renderer restore, controller list).
     advertisedUrlWatcher.bindPty(ptyId, worktreeId)
     this.ptyController?.setWorktreeId?.(ptyId, worktreeId)
+    updateRegisteredPtyWorktree(ptyId, worktreeId)
     return pty
   }
 
