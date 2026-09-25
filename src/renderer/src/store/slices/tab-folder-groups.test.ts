@@ -277,8 +277,9 @@ describe('tab folder groups', () => {
   it('drops folder membership when a tab is dragged into another split pane', () => {
     store.getState().createTabFolderGroup(['tab-1', 'tab-2'], { name: 'Source' })
     const targetGroupId = store.getState().createEmptySplitGroup(WT, GROUP, 'right')
+    expect(targetGroupId).toBeTruthy()
 
-    expect(store.getState().dropUnifiedTab('tab-1', { groupId: targetGroupId })).toBe(true)
+    expect(store.getState().dropUnifiedTab('tab-1', { groupId: targetGroupId! })).toBe(true)
 
     const state = store.getState()
     expect(state.unifiedTabsByWorktree[WT].find((tab) => tab.id === 'tab-1')).toMatchObject({
