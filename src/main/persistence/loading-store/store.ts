@@ -103,6 +103,12 @@ import {
 import { agentHookServer } from '../../agent-hooks/server'
 import { pruneLocalTerminalScrollbackBuffers } from '../../../shared/workspace-session-terminal-buffers'
 import {
+  dedupeGhostTerminalTabRows,
+  findTabRowOwnerWorktree,
+  restoreDroppedTerminalTabChrome
+} from '../../../shared/workspace-session-terminal-chrome-repair'
+import { worktreeIdsEqual } from '../../../shared/worktree/id'
+import {
   backfillAutomationRunNumbers,
   pruneAutomationRuns
 } from '../../../shared/automation-run-retention'
@@ -2835,10 +2841,12 @@ export class Store {
   /** Persist a non-'local' host partition; remote hosts skip setLocalWorkspaceSession's local-daemon PTY-binding race guards. */
   private setHostWorkspaceSession(hostId: ExecutionHostId, session: WorkspaceSessionState): void {
     // Why: each partition owns its topology fence; renderer writes omit it and must rebase locally.
-    session = sanitizeWorkspaceSessionTerminalRetirements(
-      session,
-      this.state.workspaceSessionsByHostId?.[hostId]
-    )
+    const priorHost = this.state.workspaceSessionsByHostId?.[hostId]
+    session = sanitizeWorkspaceSessionTerminalRetirements(session, priorHost)
+    if (priorHost) {
+      session = restoreDroppedTerminalTabChrome(session, priorHost)
+    }
+    session = dedupeGhostTerminalTabRows(session, priorHost)
     const pruned = pruneWorkspaceSessionBrowserHistory(
       pruneLocalTerminalScrollbackBuffers(session, this.state.repos)
     )
@@ -2983,6 +2991,12 @@ export class Store {
         }
       }
     }
+    // Why: a stale save can drop a live terminal's tab chrome or re-mint its row
+    // in the spawn worktree after a move; repair both against the prior save.
+    if (prior) {
+      session = restoreDroppedTerminalTabChrome(session, prior)
+    }
+    session = dedupeGhostTerminalTabRows(session, prior)
     session = pruneLocalTerminalScrollbackBuffers(session, this.state.repos)
     if (!deferSnapshotFiles) {
       const migratedScrollback = migrateWorkspaceSessionTerminalScrollbackSnapshots(
@@ -3057,8 +3071,9 @@ export class Store {
   patchWorkspaceSession(patch: WorkspaceSessionPatch, hostId?: string | null): void {
     const resolved = this.resolveHostId(hostId)
     // Why: the debounced hot path sends only changed slices; scalar/UI patches skip terminal normalization, topology patches keep stale-PTY protections.
+    const previous = this.getWorkspaceSession(resolved)
     let next: WorkspaceSessionState = {
-      ...this.getWorkspaceSession(resolved),
+      ...previous,
       ...patch
     }
     if (workspaceSessionPatchNeedsFullNormalization(patch)) {
@@ -3068,6 +3083,11 @@ export class Store {
     if (Object.hasOwn(patch, 'browserUrlHistory')) {
       next = pruneWorkspaceSessionBrowserHistory(next)
     }
+    // Why: a chrome-only patch can omit a live terminal's tab chrome while its
+    // PTY-bound row survives in the unpatched slices; restore from the pre-patch
+    // state and keep one owner per tab id.
+    next = restoreDroppedTerminalTabChrome(next, previous)
+    next = dedupeGhostTerminalTabRows(next, previous)
     if (resolved === LOCAL_EXECUTION_HOST_ID) {
       this.state.workspaceSession = next
     } else {
@@ -3188,6 +3208,12 @@ export class Store {
     const session = this.getWorkspaceSession(resolvedHostId)
     const paneKey = `${args.tabId}:${args.leafId}`
     const bindingWorktreeId = args.expectedSourceBinding?.worktreeId ?? args.worktreeId
+    // Why: a moved tab's session id still names its spawn worktree, so binding to
+    // the prefix worktree re-mints a ghost copy of the row there. Bind to the
+    // worktree that already holds the tab unless a source expectation pins one.
+    const ownerWorktreeId = args.expectedSourceBinding
+      ? bindingWorktreeId
+      : (findTabRowOwnerWorktree(session, args.tabId) ?? bindingWorktreeId)
     if (args.expectedSourceBinding) {
       const expected = args.expectedSourceBinding
       if (expected.tabId !== args.tabId) {
@@ -3209,8 +3235,8 @@ export class Store {
       }
     }
     if (args.expectedBinding) {
-      const tab = session.tabsByWorktree?.[bindingWorktreeId]?.find(
-        (candidate) => candidate.id === args.tabId && candidate.worktreeId === bindingWorktreeId
+      const tab = session.tabsByWorktree?.[ownerWorktreeId]?.find(
+        (candidate) => candidate.id === args.tabId && worktreeIdsEqual(candidate.worktreeId, ownerWorktreeId)
       )
       const boundPtyId = session.terminalLayoutsByTabId?.[args.tabId]?.ptyIdsByLeafId?.[args.leafId]
       if (
@@ -3270,7 +3296,7 @@ export class Store {
         delete session.terminalSurfaceTombstonesByPaneKey[paneKey]
       }
     }
-    const tabs = session.tabsByWorktree?.[bindingWorktreeId]
+    const tabs = session.tabsByWorktree?.[ownerWorktreeId]
     const tab = tabs?.find((t) => t.id === args.tabId)
     if (tab) {
       tab.ptyId = args.ptyId
@@ -3281,19 +3307,19 @@ export class Store {
         ...(tabs ?? []),
         createMinimalPersistedTerminalTab({
           ...args,
-          worktreeId: bindingWorktreeId,
+          worktreeId: ownerWorktreeId,
           existingTabCount: tabs?.length ?? 0
         })
       ]
       session.tabsByWorktree = {
         ...session.tabsByWorktree,
-        [bindingWorktreeId]: nextTabs
+        [ownerWorktreeId]: nextTabs
       }
-      session.activeWorktreeId ??= bindingWorktreeId
+      session.activeWorktreeId ??= ownerWorktreeId
       session.activeTabId ??= args.tabId
       session.activeTabIdByWorktree = {
         ...session.activeTabIdByWorktree,
-        [bindingWorktreeId]: session.activeTabIdByWorktree?.[bindingWorktreeId] ?? args.tabId
+        [ownerWorktreeId]: session.activeTabIdByWorktree?.[ownerWorktreeId] ?? args.tabId
       }
     }
     if (!isTerminalLeafId(args.leafId)) {
