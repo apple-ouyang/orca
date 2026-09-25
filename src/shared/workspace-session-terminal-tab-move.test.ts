@@ -115,6 +115,95 @@ describe('moveTerminalTabInWorkspaceSession', () => {
     expect(moveTerminalTabInWorkspaceSession(session(), SOURCE, DEST, 'missing').moved).toBe(false)
   })
 
+  it('treats a path-respelled worktree id as the same worktree', () => {
+    expect(moveTerminalTabInWorkspaceSession(session(), SOURCE, 'repo::/src/', 'tab-1').moved).toBe(
+      false
+    )
+  })
+
+  it('replaces a stale destination copy instead of dropping the moving tab', () => {
+    const stale = session()
+    stale.unifiedTabs = {
+      ...stale.unifiedTabs,
+      [DEST]: [...(stale.unifiedTabs?.[DEST] ?? []), unifiedTab('tab-1', DEST, 'group-dest')]
+    }
+    stale.tabGroups = {
+      ...stale.tabGroups,
+      [DEST]: (stale.tabGroups?.[DEST] ?? []).map((group) =>
+        group.id === 'group-dest' ? { ...group, tabOrder: [...group.tabOrder, 'tab-1'] } : group
+      )
+    }
+    stale.tabsByWorktree = {
+      ...stale.tabsByWorktree,
+      [DEST]: [...(stale.tabsByWorktree[DEST] ?? []), terminalTab('tab-1', DEST, 'pty-stale')]
+    }
+
+    const result = moveTerminalTabInWorkspaceSession(stale, SOURCE, DEST, 'tab-1')
+
+    expect(result.moved).toBe(true)
+    expect(result.session.unifiedTabs?.[DEST]?.map((tab) => tab.id)).toEqual(['tab-dest', 'tab-1'])
+    expect(result.session.tabGroups?.[DEST]?.flatMap((group) => group.tabOrder)).toEqual([
+      'tab-dest',
+      'tab-1'
+    ])
+    const destRows = (result.session.tabsByWorktree[DEST] ?? []).filter(
+      (tab) => tab.id === 'tab-1'
+    )
+    expect(destRows).toHaveLength(1)
+    expect(destRows[0]).toMatchObject({ ptyId: 'pty-1', worktreeId: DEST })
+  })
+
+  it('moves into the focused destination pane and strips the id from other panes', () => {
+    const split = session()
+    split.activeGroupIdByWorktree = { [DEST]: 'group-focus' }
+    split.unifiedTabs = {
+      ...split.unifiedTabs,
+      [DEST]: [unifiedTab('tab-1', DEST, 'group-dest'), unifiedTab('tab-dest', DEST, 'group-focus')]
+    }
+    split.tabGroups = {
+      ...split.tabGroups,
+      [DEST]: [
+        {
+          id: 'group-dest',
+          worktreeId: DEST,
+          activeTabId: null,
+          tabOrder: ['tab-1'],
+          recentTabIds: []
+        },
+        {
+          id: 'group-focus',
+          worktreeId: DEST,
+          activeTabId: 'tab-dest',
+          tabOrder: ['tab-dest'],
+          recentTabIds: ['tab-dest']
+        }
+      ]
+    }
+    split.tabGroupLayouts = {
+      ...split.tabGroupLayouts,
+      [DEST]: {
+        type: 'split',
+        direction: 'horizontal',
+        first: { type: 'leaf', groupId: 'group-dest' },
+        second: { type: 'leaf', groupId: 'group-focus' }
+      }
+    }
+
+    const result = moveTerminalTabInWorkspaceSession(split, SOURCE, DEST, 'tab-1')
+
+    expect(result.moved).toBe(true)
+    expect(
+      result.session.tabGroups?.[DEST]?.find((group) => group.id === 'group-focus')?.tabOrder
+    ).toEqual(['tab-dest', 'tab-1'])
+    expect(
+      result.session.tabGroups?.[DEST]?.find((group) => group.id === 'group-dest')?.tabOrder
+    ).toEqual([])
+    expect(result.session.unifiedTabs?.[DEST]?.find((tab) => tab.id === 'tab-1')?.groupId).toBe(
+      'group-focus'
+    )
+    expect(result.session.activeGroupIdByWorktree?.[DEST]).toBe('group-focus')
+  })
+
   it('rejects a terminal row that has no matching unified tab', () => {
     const broken = session()
     broken.unifiedTabs = {
