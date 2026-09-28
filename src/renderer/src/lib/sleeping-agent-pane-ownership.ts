@@ -94,7 +94,7 @@ function hasRestorableStablePanePty(
 // the pane that reconnects on activation. Liveness comes from the runtime
 // live-PTY map (ptyIdsByTabId), not the layout's ptyIdsByLeafId snapshot, which
 // persists stale across sleep/restart.
-function stablePaneHasLivePty(
+export function stablePaneHasLivePty(
   tabId: string,
   leafId: string,
   ptyIdsByTabId: Record<string, string[]>,
@@ -125,7 +125,8 @@ function paneWillConnectOnActivation(
   // never cancels it), so any preserved restorable pane cold-restores in place.
   // Gating on the visible tab forked a second live surface onto the same
   // provider session for every non-group-active agent tab. Web-mirror tabs are
-  // the exception: they never mount a local pane, so they cannot own recovery.
+  // the exception: their pane attaches the host PTY instead of cold-restoring
+  // from a note, so they cannot own recovery.
   return !isWebTerminalSurfaceTabId(tabId)
 }
 

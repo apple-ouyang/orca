@@ -1,16 +1,11 @@
 import type {
   RuntimeMobileSessionRetiredTerminalSurface,
-  RuntimeMobileSessionSnapshotTab,
   RuntimeMobileSessionTabGroup,
   RuntimeMobileSessionTabsSnapshot,
   RuntimeMobileSessionTerminalTab
 } from '../../shared/runtime-types'
-import {
-  collectRecentTabIdsFromGroups,
-  pickMostRecentSurvivingTabId,
-  pickNextTabAfterClose,
-  pruneRecentTabIds
-} from '../../shared/session-tab-close-successor'
+import { pruneRecentTabIds } from '../../shared/session-tab-close-successor'
+import { chooseActiveSurface, topLevelTabId } from './mobile-session-terminal-retirement-surface'
 import type { TabGroupLayoutNode } from '../../shared/tab-types'
 import type {
   TerminalLayoutSnapshot,
@@ -121,11 +116,26 @@ function chooseGroupActiveTab(
   if (group.activeTabId && retainedTabIds.has(group.activeTabId)) {
     return group.activeTabId
   }
-  const recent = (group.recentTabIds ?? []).toReversed().find((tabId) => retainedTabIds.has(tabId))
+  // Node 18 is the orcad floor and does not provide Array.prototype.toReversed.
+  let recent: string | undefined
+  for (let index = (group.recentTabIds?.length ?? 0) - 1; index >= 0; index -= 1) {
+    const tabId = group.recentTabIds?.[index]
+    if (tabId && retainedTabIds.has(tabId)) {
+      recent = tabId
+      break
+    }
+  }
+  if (recent) {
+    return recent
+  }
   // Why: no previous visit → most recently added remaining tab, not the leftmost.
-  return (
-    recent ?? [...group.tabOrder].toReversed().find((tabId) => retainedTabIds.has(tabId)) ?? null
-  )
+  for (let index = group.tabOrder.length - 1; index >= 0; index -= 1) {
+    const tabId = group.tabOrder[index]!
+    if (retainedTabIds.has(tabId)) {
+      return tabId
+    }
+  }
+  return null
 }
 
 export function repairMobileSessionTabGroupsAfterRetirement(
@@ -152,45 +162,6 @@ export function repairMobileSessionTabGroupsAfterRetirement(
     ]
   })
   return repaired.length > 0 ? repaired : undefined
-}
-
-function topLevelTabId(tab: RuntimeMobileSessionSnapshotTab): string {
-  return tab.type === 'terminal' ? tab.parentTabId : tab.id
-}
-
-function chooseActiveSurface(
-  tabs: readonly RuntimeMobileSessionSnapshotTab[],
-  previousActiveId: string | null,
-  groups: readonly RuntimeMobileSessionTabGroup[] | undefined,
-  previousActiveGroupId: string | null,
-  recentTabIds?: readonly string[]
-): RuntimeMobileSessionSnapshotTab | null {
-  // Why: keep a surviving active surface first — the previous tab when it lives,
-  // otherwise a surviving pane of the retired active terminal (split terminal).
-  const preserved =
-    (previousActiveId ? tabs.find((tab) => tab.id === previousActiveId) : undefined) ??
-    tabs.find((tab) => tab.isActive)
-  if (preserved) {
-    return preserved
-  }
-  // Why: the visit history (global first, per-group merge for older snapshots)
-  // outranks the repaired group selection, so retiring the active tab cannot
-  // resurrect an older group sibling over a newer cross-group visit.
-  const history = recentTabIds ?? collectRecentTabIdsFromGroups(groups)
-  const recentId = pickMostRecentSurvivingTabId({
-    remainingTabIds: tabs.map(topLevelTabId),
-    closingTabId: previousActiveId ?? '',
-    recentTabIds: history
-  })
-  const activeGroup = previousActiveGroupId
-    ? groups?.find((group) => group.id === previousActiveGroupId)
-    : groups?.[0]
-  const activeTopLevelId = activeGroup?.activeTabId
-  return (
-    (recentId ? tabs.find((tab) => topLevelTabId(tab) === recentId) : undefined) ??
-    (activeTopLevelId ? tabs.find((tab) => topLevelTabId(tab) === activeTopLevelId) : undefined) ??
-    pickNextTabAfterClose(tabs, previousActiveId ?? '', history, topLevelTabId)
-  )
 }
 
 function terminalMatchesRetirement(
