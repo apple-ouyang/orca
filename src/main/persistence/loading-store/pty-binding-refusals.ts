@@ -3,6 +3,7 @@ import { isTerminalLeafId } from '../../../shared/stable-pane-id'
 import type { WorkspaceSessionState } from '../../../shared/workspace-session-state-types'
 import type { TerminalSessionPartition } from '../terminal-topology/terminal-owner-invariants'
 import { layoutContainsLeafId } from '../restoring-sessions/terminal-layout-normalization'
+import { worktreeIdsEqual } from '../../../shared/worktree/id'
 import type { PtyBindingSourceExpectation } from './store'
 
 export type PtyBindingRefusalRequest = {

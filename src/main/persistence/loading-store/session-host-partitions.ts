@@ -206,7 +206,9 @@ export function setHostWorkspaceSession(
   session = sanitizeWorkspaceSessionTerminalRetirements(session, prior)
   // Why: a stale save can drop a live terminal's tab chrome or re-mint its row
   // in the spawn worktree after a move; repair both against the prior save.
-  session = restoreDroppedTerminalTabChrome(session, prior)
+  if (prior) {
+    session = restoreDroppedTerminalTabChrome(session, prior)
+  }
   session = dedupeGhostTerminalTabRows(session, prior)
   session = preserveMissingWorkspaceSessionTerminalBindings(
     session,

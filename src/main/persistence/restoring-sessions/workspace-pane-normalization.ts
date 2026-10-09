@@ -20,7 +20,6 @@ import {
   dedupeGhostTerminalTabRows,
   mintMissingTerminalTabChrome
 } from '../../../shared/workspace-session-terminal-chrome-repair'
->>>>>>> 882b13c32 (fix(persistence): keep one tab row and its chrome per moved terminal)
 import { normalizeTerminalLayoutSnapshotForPersistence } from './terminal-layout-normalization'
 import {
   legacyMigrationUnsupportedRowsToAliasEntries,
@@ -204,7 +203,6 @@ export function normalizePersistedPaneIdentityState(
     dedupeGhostTerminalTabRows(normalizedSession.session, undefined)
   )
   const sessionOwnershipRepaired = repairedSession !== normalizedSession.session
->>>>>>> 882b13c32 (fix(persistence): keep one tab row and its chrome per moved terminal)
   let acknowledgementLeafIdByInputLeafIdByTabId = normalizedSession.leafIdByInputLeafIdByTabId
   const remapsByHostId = new Map<ExecutionHostId, WorkspaceSessionPaneIdentityRemap>([
     [LOCAL_EXECUTION_HOST_ID, normalizedSession]
@@ -239,7 +237,6 @@ export function normalizePersistedPaneIdentityState(
       normalizedHostSessions[hostId] = repairedHostSession
       hostSessionsChanged ||=
         normalizedHostSession.changed || repairedHostSession !== normalizedHostSession.session
->>>>>>> 882b13c32 (fix(persistence): keep one tab row and its chrome per moved terminal)
       remapsByHostId.set(hostId, normalizedHostSession)
       acknowledgementLeafIdByInputLeafIdByTabId = mergeAcknowledgementLeafIdMapsByTabId(
         acknowledgementLeafIdByInputLeafIdByTabId,

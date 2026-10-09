@@ -1,5 +1,5 @@
 import type { SshChannelMultiplexer } from '../ssh/ssh-channel-multiplexer'
-import type { IPtyProvider, PtyProcessInfo, PtySpawnOptions, PtySpawnResult } from './types'
+import type { IPtyProvider, PtySpawnOptions, PtySpawnResult } from './types'
 import type { WriteSettlement } from '../../shared/pty-write-settlement'
 import type { TerminalOscColorQueryReplyColors } from '../../shared/terminal-osc-color-reply'
 import { parseAppSshPtyId, toAppSshPtyId, toRelaySshPtyId } from './ssh-pty-id'

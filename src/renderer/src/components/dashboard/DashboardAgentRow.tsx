@@ -36,19 +36,6 @@ import {
 } from '@/components/tab-bar/MoveTerminalToWorktreeMenuSection'
 import { TAB_CONTEXT_MENU_CONTENT_CLASS } from '@/components/tab-bar/tab-context-menu-sizing'
 
-// Why: narrow the dashboard's rollup states to shared dot states, defaulting unknowns to 'idle' so a row never crashes.
-function asDotState(state: AgentStatusState | 'idle'): AgentDotState {
-  switch (state) {
-    case 'working':
-    case 'blocked':
-    case 'waiting':
-    case 'done':
-    case 'idle':
-      return state
-  }
-  return 'idle'
-}
-
 function formatTimeAgo(ts: number, now: number): string {
   const delta = now - ts
   if (delta < 60_000) {
