@@ -205,7 +205,8 @@ export type {
 export type {
   RuntimeMarkdownReadTabResult,
   RuntimeMarkdownSaveTabResult
-} from './mobile-markdown-document'export type RuntimeTerminalMove = {
+} from './mobile-markdown-document'
+export type RuntimeTerminalMove = {
   handle: string
   tabId: string
   sourceWorktreeId: string
