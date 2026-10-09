@@ -6,7 +6,6 @@ import {
   getWorktreePathBasenameFromId,
   splitWorktreeId,
   splitWorktreeIdForFilesystem,
-  worktreeIdComparisonKey
   worktreeIdComparisonKey,
   worktreeIdsEqual
 } from './id'
@@ -196,6 +195,9 @@ describe('worktreeIdComparisonKey path-spelling parity for id: selectors (#16243
     expect(key('repo-a')).toBeNull()
     expect(key('repo-a::')).toBeNull()
     expect(key('/srv/workspaces/plugin')).toBeNull()
+  })
+})
+
 describe('worktreeIdsEqual', () => {
   it('folds path spelling differences into one worktree', () => {
     expect(worktreeIdsEqual('repo-123::/abs/path', 'repo-123::/abs/path/')).toBe(true)

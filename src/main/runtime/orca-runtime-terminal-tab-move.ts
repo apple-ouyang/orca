@@ -90,7 +90,9 @@ export class OrcaRuntimeWithTerminalTabMove extends OrcaRuntimeWithMigrationCata
       }
     }
     for (const pty of this.ptysById.values()) {
-      if (pty.worktreeId === worktreeId && pty.tabId === tabId && pty.connected && pty.ptyId) {
+      // Why: no `connected` gate — rebindRuntimeTabWorktreeMaps moves disconnected
+      // records too, and the result's ptyIds must name every rebound PTY.
+      if (pty.worktreeId === worktreeId && pty.tabId === tabId && pty.ptyId) {
         ptyIds.add(pty.ptyId)
       }
     }
